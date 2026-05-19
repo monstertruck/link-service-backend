@@ -3,6 +3,13 @@ from typing import Optional
 from enum import Enum
 
 
+class LinkStatus(str, Enum):
+    """Read status of a saved link."""
+
+    UNREAD = "unread"
+    READ = "read"
+
+
 class LinkCategory(str, Enum):
     """Enumeration of possible link categories."""
 
@@ -48,4 +55,6 @@ class LinkResponse(BaseModel):
     title: Optional[str] = None
     category: LinkCategory
     summary: str
+    status: LinkStatus = LinkStatus.UNREAD
+    status_changed_at: Optional[str] = None
 
