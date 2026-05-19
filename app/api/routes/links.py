@@ -10,21 +10,22 @@ from app.crud.links import delete_link as db_delete_link
 from app.crud.links import get_link, get_link_by_url, list_links, update_link_status
 from app.models.link import LinkRecord
 from app.db import get_session
-from lib.llm import categorize_link, summarize_url
+from lib.llm import categorize_link, summarize_url_with_title
+from lib.utils import title_from_url
 
-router = APIRouter(prefix="/links", tags=["links"])
+router = APIRouter(prefix="/links", tags=["links"], redirect_slashes=False)
 
-categories_router = APIRouter(prefix="/categories", tags=["categories"])
+categories_router = APIRouter(prefix="/categories", tags=["categories"], redirect_slashes=False)
 
 
-@categories_router.get("/")
+@categories_router.get("")
 def list_categories(session: Session = Depends(get_session)) -> list[dict]:
     """Return all valid categories and the number of saved links in each."""
     counts = count_links_by_category(session)
     return [{"category": cat.value, "count": counts[cat]} for cat in LinkCategory]
 
 
-@router.post("/", response_model=LinkResponse, status_code=201)
+@router.post("", response_model=LinkResponse, status_code=201)
 async def create_link(
     request: LinkRequest, response: Response, session: Session = Depends(get_session)
 ) -> LinkResponse:
@@ -35,7 +36,11 @@ async def create_link(
     - Returns 409 if the URL has already been saved.
     """
     try:
-        summary = request.summary or await summarize_url(request.url)
+        if request.summary:
+            summary = request.summary
+            html_title = None
+        else:
+            html_title, summary = await summarize_url_with_title(request.url)
         category = categorize_link(summary)
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -47,8 +52,9 @@ async def create_link(
         response.status_code = 409
         return _to_response(existing)
 
+    title = request.title or html_title or title_from_url(request.url)
     record = db_create_link(
-        session, url=request.url, summary=summary, category=category, title=request.title
+        session, url=request.url, summary=summary, category=category, title=title
     )
     return _to_response(record)
 
@@ -65,7 +71,7 @@ def _to_response(record: LinkRecord, status_code: int = 201) -> LinkResponse:
     )
 
 
-@router.get("/", response_model=list[LinkResponse])
+@router.get("", response_model=list[LinkResponse])
 def list_all_links(
     skip: int = 0,
     limit: int = 100,
