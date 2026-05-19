@@ -19,10 +19,20 @@ categories_router = APIRouter(prefix="/categories", tags=["categories"], redirec
 
 
 @categories_router.get("")
-def list_categories(session: Session = Depends(get_session)) -> list[dict]:
-    """Return all valid categories and the number of saved links in each."""
+def list_categories(
+    include_all: bool = False, session: Session = Depends(get_session)
+) -> list[dict]:
+    """Return categories with their link counts.
+
+    By default only categories with at least one link are returned.
+    Pass `include_all=true` to include all categories regardless of count.
+    """
     counts = count_links_by_category(session)
-    return [{"category": cat.value, "count": counts[cat]} for cat in LinkCategory]
+    return [
+        {"category": cat.value, "count": counts[cat]}
+        for cat in LinkCategory
+        if include_all or counts[cat] > 0
+    ]
 
 
 @router.post("", response_model=LinkResponse, status_code=201)
