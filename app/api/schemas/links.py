@@ -43,6 +43,7 @@ class LinkRequest(BaseModel):
 class LinkResponse(BaseModel):
     """Response body returned after processing a link."""
 
+    id: Optional[int] = None
     url: str
     title: Optional[str] = None
     category: LinkCategory

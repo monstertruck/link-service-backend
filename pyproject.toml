@@ -13,6 +13,7 @@ dependencies = [
     "lxml>=5.0",
     "playwright>=1.44",
     "pydantic>=2.8",
+    "sqlmodel>=0.0.25",
     "uvicorn>=0.30",
 ]
 
