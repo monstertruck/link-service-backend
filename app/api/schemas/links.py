@@ -2,14 +2,6 @@ from pydantic import BaseModel
 from typing import Optional
 from enum import Enum
 
-class Link(BaseModel):
-    """Pydantic model for a stored link."""
-
-    url: str
-    title: str
-    category: str
-    summary: Optional[str] = None
-
 
 class LinkCategory(str, Enum):
     """Enumeration of possible link categories."""
@@ -29,4 +21,30 @@ class LinkCategory(str, Enum):
     COOKING = "cooking"
     SHOPPING = "shopping"
     OTHER = "other"
+
+
+class Link(BaseModel):
+    """Pydantic model for a stored link."""
+
+    url: str
+    title: Optional[str] = None
+    category: LinkCategory
+    summary: Optional[str] = None
+
+
+class LinkRequest(BaseModel):
+    """Request body for creating a link."""
+
+    url: str
+    title: Optional[str] = None
+    summary: Optional[str] = None
+
+
+class LinkResponse(BaseModel):
+    """Response body returned after processing a link."""
+
+    url: str
+    title: Optional[str] = None
+    category: LinkCategory
+    summary: str
 
