@@ -1,7 +1,11 @@
 """FastAPI router for link creation and processing."""
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlmodel import Session
+
+logger = logging.getLogger(__name__)
 
 from app.api.schemas.links import CategoryCreate, CategoryResponse, LinkCategory, LinkRequest, LinkResponse, LinkStatus, LinkUpdate
 from app.crud.categories import create_category, delete_category, get_category_by_name, list_categories, rename_category
@@ -84,6 +88,7 @@ async def create_link(
     - Category is always assigned by Claude based on the summary.
     - Returns 409 if the URL has already been saved.
     """
+    logger.info("Creating link url=%s", request.url)
     try:
         if is_youtube_url(request.url) and not request.summary:
             html_title, _ = await summarize_url_with_title(request.url)
@@ -98,8 +103,10 @@ async def create_link(
             html_title, summary = await summarize_url_with_title(request.url)
             category = categorize_link(summary)
     except RuntimeError as exc:
+        logger.error("Service error for url=%s: %s", request.url, exc)
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
+        logger.exception("Unexpected error processing url=%s", request.url)
         raise HTTPException(status_code=502, detail=f"Failed to process URL: {exc}") from exc
 
     existing = get_link_by_url(session, request.url)
