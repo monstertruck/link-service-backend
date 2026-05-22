@@ -1,13 +1,18 @@
 """FastAPI router for link creation and processing."""
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlmodel import Session
 
-from app.api.schemas.links import LinkCategory, LinkRequest, LinkResponse, LinkStatus
+logger = logging.getLogger(__name__)
+
+from app.api.schemas.links import CategoryCreate, CategoryResponse, LinkCategory, LinkRequest, LinkResponse, LinkStatus, LinkUpdate
+from app.crud.categories import create_category, delete_category, get_category_by_name, list_categories, rename_category
 from app.crud.links import count_links_by_category
 from app.crud.links import create_link as db_create_link
 from app.crud.links import delete_link as db_delete_link
-from app.crud.links import get_link, get_link_by_url, list_links, update_link_status
+from app.crud.links import get_link, get_link_by_url, list_links, update_link, update_link_status
 from app.models.link import LinkRecord
 from app.db import get_session
 from lib.llm import categorize_link, summarize_url_with_title
@@ -19,7 +24,7 @@ categories_router = APIRouter(prefix="/categories", tags=["categories"], redirec
 
 
 @categories_router.get("")
-def list_categories(
+def get_categories(
     include_all: bool = False, session: Session = Depends(get_session)
 ) -> list[dict]:
     """Return categories with their link counts.
@@ -28,11 +33,49 @@ def list_categories(
     Pass `include_all=true` to include all categories regardless of count.
     """
     counts = count_links_by_category(session)
+    all_categories = list_categories(session)
     return [
-        {"category": cat.value, "count": counts[cat]}
-        for cat in LinkCategory
-        if include_all or counts[cat] > 0
+        {"category": cat.name, "count": counts.get(cat.name, 0)}
+        for cat in all_categories
+        if include_all or counts.get(cat.name, 0) > 0
     ]
+
+
+@categories_router.patch("/{name}", response_model=CategoryResponse)
+def update_category(name: str, body: CategoryCreate, session: Session = Depends(get_session)) -> CategoryResponse:
+    """Rename a category."""
+    new_name = body.name.strip().lower()
+    if not new_name:
+        raise HTTPException(status_code=422, detail="Category name must not be empty")
+    if get_category_by_name(session, new_name):
+        raise HTTPException(status_code=409, detail=f"Category already exists: {new_name}")
+    record = rename_category(session, name.strip().lower(), new_name)
+    if not record:
+        raise HTTPException(status_code=404, detail=f"Category not found: {name}")
+    return CategoryResponse(name=record.name)
+
+
+@categories_router.delete("/{name}", status_code=204)
+def remove_category(name: str, session: Session = Depends(get_session)) -> None:
+    """Delete a category by name."""
+    deleted = delete_category(session, name.strip().lower())
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"Category not found: {name}")
+
+
+@categories_router.post("", response_model=CategoryResponse, status_code=201)
+def add_category(
+    body: CategoryCreate, session: Session = Depends(get_session)
+) -> CategoryResponse:
+    """Create a new category."""
+    name = body.name.strip().lower()
+    if not name:
+        raise HTTPException(status_code=422, detail="Category name must not be empty")
+    existing = get_category_by_name(session, name)
+    if existing:
+        raise HTTPException(status_code=409, detail=f"Category already exists: {name}")
+    record = create_category(session, name)
+    return CategoryResponse(name=record.name)
 
 
 @router.post("", response_model=LinkResponse, status_code=201)
@@ -45,6 +88,7 @@ async def create_link(
     - Category is always assigned by Claude based on the summary.
     - Returns 409 if the URL has already been saved.
     """
+    logger.info("Creating link url=%s", request.url)
     try:
         if is_youtube_url(request.url) and not request.summary:
             html_title, _ = await summarize_url_with_title(request.url)
@@ -59,8 +103,10 @@ async def create_link(
             html_title, summary = await summarize_url_with_title(request.url)
             category = categorize_link(summary)
     except RuntimeError as exc:
+        logger.error("Service error for url=%s: %s", request.url, exc)
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
+        logger.exception("Unexpected error processing url=%s", request.url)
         raise HTTPException(status_code=502, detail=f"Failed to process URL: {exc}") from exc
 
     existing = get_link_by_url(session, request.url)
@@ -91,7 +137,7 @@ def _to_response(record: LinkRecord, status_code: int = 201) -> LinkResponse:
 def list_all_links(
     skip: int = 0,
     limit: int = 100,
-    category: LinkCategory | None = None,
+    category: str | None = None,
     status: LinkStatus | None = None,
     session: Session = Depends(get_session),
 ) -> list[LinkResponse]:
@@ -115,6 +161,22 @@ def set_link_status(
 ) -> LinkResponse:
     """Update the read status of a link (unread / read)."""
     record = update_link_status(session, link_id, status)
+    if not record:
+        raise HTTPException(status_code=404, detail="Link not found")
+    return _to_response(record)
+
+
+@router.patch("/{link_id}", response_model=LinkResponse)
+def patch_link(
+    link_id: int, body: LinkUpdate, session: Session = Depends(get_session)
+) -> LinkResponse:
+    """Update a link's category and/or status."""
+    if body.category is not None:
+        category_name = body.category.strip().lower()
+        if not get_category_by_name(session, category_name):
+            raise HTTPException(status_code=422, detail=f"Unknown category: {category_name}")
+        body = LinkUpdate(category=category_name, status=body.status)
+    record = update_link(session, link_id, body.category, body.status)
     if not record:
         raise HTTPException(status_code=404, detail="Link not found")
     return _to_response(record)
