@@ -27,6 +27,28 @@ def create_category(session: Session, name: str) -> CategoryRecord:
     return record
 
 
+def rename_category(session: Session, name: str, new_name: str) -> CategoryRecord | None:
+    """Rename a category. Returns updated record, or None if not found."""
+    record = get_category_by_name(session, name)
+    if not record:
+        return None
+    record.name = new_name
+    session.add(record)
+    session.commit()
+    session.refresh(record)
+    return record
+
+
+def delete_category(session: Session, name: str) -> bool:
+    """Delete a category by name. Returns True if deleted, False if not found."""
+    record = get_category_by_name(session, name)
+    if not record:
+        return False
+    session.delete(record)
+    session.commit()
+    return True
+
+
 def seed_categories(session: Session, names: list[str]) -> None:
     """Insert categories that do not already exist (idempotent)."""
     for name in names:

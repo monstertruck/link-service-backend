@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlmodel import Session
 
 from app.api.schemas.links import CategoryCreate, CategoryResponse, LinkCategory, LinkRequest, LinkResponse, LinkStatus, LinkUpdate
-from app.crud.categories import create_category, get_category_by_name, list_categories
+from app.crud.categories import create_category, delete_category, get_category_by_name, list_categories, rename_category
 from app.crud.links import count_links_by_category
 from app.crud.links import create_link as db_create_link
 from app.crud.links import delete_link as db_delete_link
@@ -35,6 +35,28 @@ def get_categories(
         for cat in all_categories
         if include_all or counts.get(cat.name, 0) > 0
     ]
+
+
+@categories_router.patch("/{name}", response_model=CategoryResponse)
+def update_category(name: str, body: CategoryCreate, session: Session = Depends(get_session)) -> CategoryResponse:
+    """Rename a category."""
+    new_name = body.name.strip().lower()
+    if not new_name:
+        raise HTTPException(status_code=422, detail="Category name must not be empty")
+    if get_category_by_name(session, new_name):
+        raise HTTPException(status_code=409, detail=f"Category already exists: {new_name}")
+    record = rename_category(session, name.strip().lower(), new_name)
+    if not record:
+        raise HTTPException(status_code=404, detail=f"Category not found: {name}")
+    return CategoryResponse(name=record.name)
+
+
+@categories_router.delete("/{name}", status_code=204)
+def remove_category(name: str, session: Session = Depends(get_session)) -> None:
+    """Delete a category by name."""
+    deleted = delete_category(session, name.strip().lower())
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"Category not found: {name}")
 
 
 @categories_router.post("", response_model=CategoryResponse, status_code=201)
