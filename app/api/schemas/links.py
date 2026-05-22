@@ -53,8 +53,27 @@ class LinkResponse(BaseModel):
     id: Optional[int] = None
     url: str
     title: Optional[str] = None
-    category: LinkCategory
+    category: str
     summary: str
     status: LinkStatus = LinkStatus.UNREAD
     status_changed_at: Optional[str] = None
+
+
+class LinkUpdate(BaseModel):
+    """Request body for patching a link's mutable fields."""
+
+    category: Optional[str] = None
+    status: Optional[LinkStatus] = None
+
+
+class CategoryCreate(BaseModel):
+    """Request body for creating a new category."""
+
+    name: str
+
+
+class CategoryResponse(BaseModel):
+    """Response body for a category."""
+
+    name: str
 

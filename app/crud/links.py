@@ -4,7 +4,7 @@ from typing import Optional
 
 from sqlmodel import Session, func, select
 
-from app.api.schemas.links import LinkCategory, LinkStatus
+from app.api.schemas.links import LinkStatus
 from app.models.link import LinkRecord
 
 
@@ -12,7 +12,7 @@ def create_link(
     session: Session,
     url: str,
     summary: str,
-    category: LinkCategory,
+    category: str,
     title: Optional[str] = None,
 ) -> LinkRecord:
     """Persist a new link. Raises ValueError if the URL already exists."""
@@ -42,7 +42,7 @@ def list_links(
     session: Session,
     skip: int = 0,
     limit: int = 100,
-    category: Optional[LinkCategory] = None,
+    category: Optional[str] = None,
     status: Optional[LinkStatus] = None,
 ) -> list[LinkRecord]:
     """Return a paginated list of saved links, optionally filtered by category/status."""
@@ -69,14 +69,28 @@ def update_link_status(session: Session, link_id: int, status: LinkStatus) -> Op
     return record
 
 
-def count_links_by_category(session: Session) -> dict[LinkCategory, int]:
-    """Return a mapping of every LinkCategory to its saved link count (0 if none)."""
+def update_link(session: Session, link_id: int, category: str | None, status: "LinkStatus | None") -> "LinkRecord | None":
+    """Update a link's category and/or status. Returns None if not found."""
+    from datetime import datetime, timezone
+    record = session.get(LinkRecord, link_id)
+    if not record:
+        return None
+    if category is not None:
+        record.category = category
+    if status is not None:
+        record.status = status
+        record.status_changed_at = datetime.now(timezone.utc)
+    session.add(record)
+    session.commit()
+    session.refresh(record)
+    return record
+
+
+def count_links_by_category(session: Session) -> dict[str, int]:
+    """Return a mapping of every category name to its saved link count."""
     statement = select(LinkRecord.category, func.count(LinkRecord.id)).group_by(LinkRecord.category)
     rows = session.exec(statement).all()
-    counts: dict[LinkCategory, int] = {cat: 0 for cat in LinkCategory}
-    for category, count in rows:
-        counts[LinkCategory(category)] = count
-    return counts
+    return {category: count for category, count in rows}
 
 
 def delete_link(session: Session, link_id: int) -> bool:
