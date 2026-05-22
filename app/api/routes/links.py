@@ -90,7 +90,11 @@ async def create_link(
     """
     logger.info("Creating link url=%s", request.url)
     try:
-        if is_youtube_url(request.url) and not request.summary:
+        if request.skip_summary:
+            html_title = None
+            summary = request.summary or ""
+            category = categorize_link(summary)
+        elif is_youtube_url(request.url) and not request.summary:
             html_title, _ = await summarize_url_with_title(request.url)
             # Use the page title as the summary; skip Claude entirely.
             summary = request.title or html_title or title_from_url(request.url)
