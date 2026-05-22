@@ -11,7 +11,7 @@ from app.crud.links import get_link, get_link_by_url, list_links, update_link_st
 from app.models.link import LinkRecord
 from app.db import get_session
 from lib.llm import categorize_link, summarize_url_with_title
-from lib.utils import title_from_url
+from lib.utils import is_youtube_url, title_from_url
 
 router = APIRouter(prefix="/links", tags=["links"], redirect_slashes=False)
 
@@ -46,12 +46,18 @@ async def create_link(
     - Returns 409 if the URL has already been saved.
     """
     try:
-        if request.summary:
+        if is_youtube_url(request.url) and not request.summary:
+            html_title, _ = await summarize_url_with_title(request.url)
+            # Use the page title as the summary; skip Claude entirely.
+            summary = request.title or html_title or title_from_url(request.url)
+            category = LinkCategory.YOUTUBE
+        elif request.summary:
             summary = request.summary
             html_title = None
+            category = categorize_link(summary)
         else:
             html_title, summary = await summarize_url_with_title(request.url)
-        category = categorize_link(summary)
+            category = categorize_link(summary)
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
