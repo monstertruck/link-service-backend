@@ -45,6 +45,7 @@ class LinkRequest(BaseModel):
     url: str
     title: Optional[str] = None
     summary: Optional[str] = None
+    skip_summary: bool = False
 
 
 class LinkResponse(BaseModel):

@@ -1,0 +1,10 @@
+# Domains listed here will be rejected when POSTing a new link.
+# Use the bare hostname (with or without www).
+# Examples:
+#   - twitter.com
+#   - www.facebook.com
+skip_domains:
+  - bsky.com
+  - twitter.com
+  - x.com
+  - lobste.rs
