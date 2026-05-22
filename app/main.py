@@ -12,7 +12,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Link Service", lifespan=lifespan, redirect_slashes=False)
+app = FastAPI(title="Link Service", lifespan=lifespan)
 
 app.include_router(links_router)
 app.include_router(categories_router)
