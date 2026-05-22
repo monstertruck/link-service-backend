@@ -15,8 +15,8 @@ from app.crud.links import delete_link as db_delete_link
 from app.crud.links import get_link, get_link_by_url, list_links, update_link, update_link_status
 from app.models.link import LinkRecord
 from app.db import get_session
-from lib.llm import categorize_link, summarize_url_with_title
-from lib.utils import is_youtube_url, title_from_url
+from lib.llm import categorize_link, quick_summarize, summarize_url_with_title
+from lib.utils import is_skipped_domain, is_youtube_url, title_from_url
 
 router = APIRouter(prefix="/links", tags=["links"], redirect_slashes=False)
 
@@ -89,10 +89,16 @@ async def create_link(
     - Returns 409 if the URL has already been saved.
     """
     logger.info("Creating link url=%s", request.url)
+    if is_skipped_domain(request.url):
+        raise HTTPException(status_code=422, detail="Domain is not allowed")
     try:
         if request.skip_summary:
             html_title = None
-            summary = request.summary or ""
+            if request.summary:
+                summary = request.summary
+            else:
+                hint = request.title or title_from_url(request.url)
+                summary = quick_summarize(hint)
             category = categorize_link(summary)
         elif is_youtube_url(request.url) and not request.summary:
             html_title, _ = await summarize_url_with_title(request.url)
