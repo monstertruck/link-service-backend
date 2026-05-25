@@ -8,3 +8,15 @@ skip_domains:
   - twitter.com
   - x.com
   - lobste.rs
+# Podcast domains — links from these hosts will be rejected entirely.
+# Use the bare hostname (with or without www).
+# Examples:
+#   - podcasts.apple.com
+#   - open.spotify.com
+podcast_domains:
+  - podcasts.apple.com
+  - open.spotify.com
+  - overcast.fm
+  - pocketcasts.com
+  - castro.fm
+  - podcastaddict.com

@@ -16,7 +16,7 @@ from app.crud.links import get_link, get_link_by_url, list_links, update_link, u
 from app.models.link import LinkRecord
 from app.db import get_session
 from lib.llm import categorize_link, quick_summarize, summarize_url_with_title
-from lib.utils import is_skipped_domain, is_youtube_url, title_from_url
+from lib.utils import is_podcast_url, is_skipped_domain, is_youtube_url, title_from_url
 
 router = APIRouter(prefix="/links", tags=["links"], redirect_slashes=False)
 
@@ -91,6 +91,8 @@ async def create_link(
     logger.info("Creating link url=%s", request.url)
     if is_skipped_domain(request.url):
         raise HTTPException(status_code=422, detail="Domain is not allowed")
+    if is_podcast_url(request.url):
+        raise HTTPException(status_code=422, detail="Podcast links are not saved")
     try:
         if request.skip_summary:
             html_title = None
