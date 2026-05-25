@@ -15,6 +15,9 @@ downloads/
 eggs/
 .eggs/
 lib/
+!lib/__init__.py
+!lib/llm.py
+!lib/utils.py
 lib64/
 parts/
 sdist/

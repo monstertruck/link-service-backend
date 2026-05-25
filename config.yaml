@@ -8,6 +8,12 @@ skip_domains:
   - twitter.com
   - x.com
   - lobste.rs
+  - ft.com
+  - bloomberg.com
+  - nytimes.com
+  - wsj.com
+  - axios.com
+  - wapo.st
 # Podcast domains — links from these hosts will be rejected entirely.
 # Use the bare hostname (with or without www).
 # Examples:
